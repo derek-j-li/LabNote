@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --color-lab-50: #f0f7ff;
+  --color-lab-100: #e0efff;
+  --color-lab-200: #b9dfff;
+  --color-lab-500: #3b82f6;
+  --color-lab-600: #2563eb;
+  --color-lab-700: #1d4ed8;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* Calendar drag selection */
+.calendar-day {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.calendar-day.drag-selecting {
+  background-color: #dbeafe !important;
+}

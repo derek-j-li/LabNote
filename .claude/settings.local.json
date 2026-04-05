@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"D:/SP_LabNote\" && npm create vite@latest . -- --template react-ts 2>&1)",
+      "Bash(cd \"D:/SP_LabNote\" && echo \"y\" | npx --yes create-vite@latest . --template react-ts 2>&1)",
+      "Bash(cd \"D:/SP_LabNote\" && npx --yes create-vite@latest lab-app --template react-ts 2>&1)",
+      "Bash(cd \"D:/SP_LabNote\" && cp -r lab-app/* lab-app/.* . 2>/dev/null; rm -rf lab-app && ls -la)",
+      "Bash(cd \"D:/SP_LabNote\" && npm install 2>&1)",
+      "Bash(cd \"D:/SP_LabNote\" && npm install zustand date-fns uuid 2>&1)",
+      "Bash(cd \"D:/SP_LabNote\" && npm install -D tailwindcss @tailwindcss/vite @types/uuid 2>&1)",
+      "Bash(cd \"D:/SP_LabNote\" && npx tsc --noEmit 2>&1)",
+      "Bash(cd \"D:/SP_LabNote\" && npm run build 2>&1)",
+      "Bash(cd \"D:/SP_LabNote\" && npm install zustand date-fns uuid @types/uuid 2>&1)",
+      "Bash(cd \"D:/SP_LabNote\" && npm run dev 2>&1)",
+      "Bash(gh auth:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}
