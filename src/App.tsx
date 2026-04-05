@@ -9,8 +9,8 @@ import ExperimentDetail from './components/Experiment/ExperimentDetail';
 import LoginPage from './components/Auth/LoginPage';
 
 export default function App() {
-  const { currentView, selectedExperimentId, loadFromStorage } = useExperimentStore();
-  const { isAllowed, loading, initialize } = useAuthStore();
+  const { currentView, selectedExperimentId, loadUserExperiments, loading: dataLoading } = useExperimentStore();
+  const { isAllowed, loading: authLoading, initialize, user } = useAuthStore();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [createDates, setCreateDates] = useState<{ start: string; end: string } | null>(null);
@@ -21,10 +21,10 @@ export default function App() {
   }, [initialize]);
 
   useEffect(() => {
-    if (isAllowed) {
-      loadFromStorage();
+    if (isAllowed && user) {
+      loadUserExperiments(user.uid);
     }
-  }, [isAllowed, loadFromStorage]);
+  }, [isAllowed, user, loadUserExperiments]);
 
   const handleCreateExperiment = useCallback((startDate: string, endDate: string) => {
     setCreateDates({ start: startDate, end: endDate });
@@ -36,7 +36,7 @@ export default function App() {
     setCreateDates(null);
   }, []);
 
-  if (loading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50">
         <div className="text-gray-400">Loading...</div>

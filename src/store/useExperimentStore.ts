@@ -2,17 +2,19 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { Experiment, DailyPlan, Task } from '../types/experiment';
 import { EXPERIMENT_COLORS, DEFAULT_METADATA } from '../types/experiment';
-import { loadExperiments, saveExperiments } from '../utils/storage';
 import { eachDayOfInterval, parseISO, toDateString } from '../utils/date';
+import { fetchExperiments, saveExperiment, removeExperiment } from '../utils/firestore';
 
 interface ExperimentStore {
   experiments: Experiment[];
   selectedExperimentId: string | null;
   selectedDate: string | null;
   currentView: 'dashboard' | 'calendar';
+  userId: string | null;
+  loading: boolean;
 
   // Actions
-  loadFromStorage: () => void;
+  loadUserExperiments: (userId: string) => Promise<void>;
   addExperiment: (exp: Omit<Experiment, 'id' | 'createdAt' | 'updatedAt' | 'dailyPlans' | 'color' | 'status'>) => Experiment;
   updateExperiment: (id: string, updates: Partial<Experiment>) => void;
   deleteExperiment: (id: string) => void;
@@ -47,15 +49,32 @@ function generateDailyPlans(startDate: string, endDate: string): DailyPlan[] {
   }));
 }
 
+// Fire-and-forget save to Firestore (updates UI immediately, syncs in background)
+function syncToCloud(userId: string | null, experiment: Experiment) {
+  if (userId) {
+    saveExperiment(userId, experiment).catch((err) =>
+      console.error('Failed to sync experiment:', err)
+    );
+  }
+}
+
 export const useExperimentStore = create<ExperimentStore>((set, get) => ({
   experiments: [],
   selectedExperimentId: null,
   selectedDate: null,
   currentView: 'dashboard',
+  userId: null,
+  loading: false,
 
-  loadFromStorage: () => {
-    const experiments = loadExperiments();
-    set({ experiments });
+  loadUserExperiments: async (userId: string) => {
+    set({ userId, loading: true });
+    try {
+      const experiments = await fetchExperiments(userId);
+      set({ experiments, loading: false });
+    } catch (err) {
+      console.error('Failed to load experiments:', err);
+      set({ experiments: [], loading: false });
+    }
   },
 
   addExperiment: (exp) => {
@@ -73,9 +92,8 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
     };
 
     set((state) => {
-      const experiments = [...state.experiments, newExp];
-      saveExperiments(experiments);
-      return { experiments };
+      syncToCloud(state.userId, newExp);
+      return { experiments: [...state.experiments, newExp] };
     });
 
     return newExp;
@@ -88,7 +106,6 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
 
         const updated = { ...exp, ...updates, updatedAt: new Date().toISOString() };
 
-        // Regenerate daily plans if dates changed
         if (
           (updates.startDate && updates.startDate !== exp.startDate) ||
           (updates.endDate && updates.endDate !== exp.endDate)
@@ -97,30 +114,34 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
           const newEnd = updates.endDate || exp.endDate;
           const newPlans = generateDailyPlans(newStart, newEnd);
 
-          // Preserve existing plan data where dates match
           updated.dailyPlans = newPlans.map((newPlan) => {
             const existing = exp.dailyPlans.find((p) => p.date === newPlan.date);
             return existing ? { ...existing, dayNumber: newPlan.dayNumber } : newPlan;
           });
         }
 
-        // Update color if type changed
         if (updates.type) {
           updated.color = EXPERIMENT_COLORS[updates.type];
         }
 
+        syncToCloud(state.userId, updated);
         return updated;
       });
-      saveExperiments(experiments);
       return { experiments };
     });
   },
 
   deleteExperiment: (id) => {
     set((state) => {
-      const experiments = state.experiments.filter((exp) => exp.id !== id);
-      saveExperiments(experiments);
-      return { experiments, selectedExperimentId: state.selectedExperimentId === id ? null : state.selectedExperimentId };
+      if (state.userId) {
+        removeExperiment(state.userId, id).catch((err) =>
+          console.error('Failed to delete experiment:', err)
+        );
+      }
+      return {
+        experiments: state.experiments.filter((exp) => exp.id !== id),
+        selectedExperimentId: state.selectedExperimentId === id ? null : state.selectedExperimentId,
+      };
     });
   },
 
@@ -132,15 +153,16 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
     set((state) => {
       const experiments = state.experiments.map((exp) => {
         if (exp.id !== experimentId) return exp;
-        return {
+        const updated = {
           ...exp,
           updatedAt: new Date().toISOString(),
           dailyPlans: exp.dailyPlans.map((plan) =>
             plan.dayNumber === dayNumber ? { ...plan, ...updates } : plan
           ),
         };
+        syncToCloud(state.userId, updated);
+        return updated;
       });
-      saveExperiments(experiments);
       return { experiments };
     });
   },
@@ -150,7 +172,7 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
     set((state) => {
       const experiments = state.experiments.map((exp) => {
         if (exp.id !== experimentId) return exp;
-        return {
+        const updated = {
           ...exp,
           updatedAt: new Date().toISOString(),
           dailyPlans: exp.dailyPlans.map((plan) =>
@@ -159,8 +181,9 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
               : plan
           ),
         };
+        syncToCloud(state.userId, updated);
+        return updated;
       });
-      saveExperiments(experiments);
       return { experiments };
     });
   },
@@ -169,7 +192,7 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
     set((state) => {
       const experiments = state.experiments.map((exp) => {
         if (exp.id !== experimentId) return exp;
-        return {
+        const updated = {
           ...exp,
           updatedAt: new Date().toISOString(),
           dailyPlans: exp.dailyPlans.map((plan) =>
@@ -183,8 +206,9 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
               : plan
           ),
         };
+        syncToCloud(state.userId, updated);
+        return updated;
       });
-      saveExperiments(experiments);
       return { experiments };
     });
   },
@@ -193,7 +217,7 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
     set((state) => {
       const experiments = state.experiments.map((exp) => {
         if (exp.id !== experimentId) return exp;
-        return {
+        const updated = {
           ...exp,
           updatedAt: new Date().toISOString(),
           dailyPlans: exp.dailyPlans.map((plan) =>
@@ -202,8 +226,9 @@ export const useExperimentStore = create<ExperimentStore>((set, get) => ({
               : plan
           ),
         };
+        syncToCloud(state.userId, updated);
+        return updated;
       });
-      saveExperiments(experiments);
       return { experiments };
     });
   },
